@@ -88,8 +88,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String backendMessage = '';
   Map<String, dynamic>? fetchedData;
   String oracleQuestion = '';
-  String? oracleAnswer;
   bool isOracleLoading = false;
+
+  // Chat message model
+  List<Map<String, String>> oracleChat = [];
 
   Future<void> callBackend() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -137,9 +139,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> askOracle() async {
+    if (oracleQuestion.trim().isEmpty) return;
     setState(() {
       isOracleLoading = true;
-      oracleAnswer = null;
+      oracleChat.add({'role': 'user', 'text': oracleQuestion});
     });
     final user = FirebaseAuth.instance.currentUser;
     final idToken = await user?.getIdToken();
@@ -156,15 +159,23 @@ class _HomeScreenState extends State<HomeScreen> {
         isOracleLoading = false;
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
-          oracleAnswer = data['answer'] ?? 'No answer';
+          oracleChat.add({
+            'role': 'oracle',
+            'text': data['answer'] ?? 'No answer',
+          });
         } else {
-          oracleAnswer = 'Error: ${response.statusCode}';
+          oracleChat.add({
+            'role': 'oracle',
+            'text': 'Error: ${response.statusCode}',
+          });
         }
+        oracleQuestion = '';
       });
     } catch (e) {
       setState(() {
         isOracleLoading = false;
-        oracleAnswer = 'Error: $e';
+        oracleChat.add({'role': 'oracle', 'text': 'Error: $e'});
+        oracleQuestion = '';
       });
     }
   }
@@ -215,43 +226,72 @@ class _HomeScreenState extends State<HomeScreen> {
               const Divider(),
               const SizedBox(height: 16),
               Text(
-                'Ask Oracle (AI):',
+                'Oracle Chat',
                 style: Theme.of(context).textTheme.titleMedium,
+              ),
+              Container(
+                height: 300,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: ListView.builder(
+                  itemCount: oracleChat.length,
+                  itemBuilder: (context, index) {
+                    final msg = oracleChat[index];
+                    final isUser = msg['role'] == 'user';
+                    return Align(
+                      alignment: isUser
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isUser ? Colors.green[100] : Colors.blue[50],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          msg['text'] ?? '',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: isUser ? Colors.black87 : Colors.blue[900],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 8,
                 ),
-                child: TextField(
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'Type your financial question',
-                  ),
-                  onChanged: (val) => oracleQuestion = val,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          labelText: 'Type your financial question',
+                        ),
+                        onChanged: (val) => oracleQuestion = val,
+                        onSubmitted: (_) => askOracle(),
+                        controller: TextEditingController(text: oracleQuestion),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: isOracleLoading ? null : askOracle,
+                      child: isOracleLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send),
+                    ),
+                  ],
                 ),
               ),
-              ElevatedButton(
-                onPressed: isOracleLoading ? null : askOracle,
-                child: isOracleLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Ask Oracle'),
-              ),
-              const SizedBox(height: 16),
-              if (oracleAnswer != null)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  color: Colors.blue[50],
-                  width: double.infinity,
-                  child: Text(
-                    oracleAnswer!,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
             ],
           ),
         ),
