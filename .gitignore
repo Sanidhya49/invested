@@ -1,0 +1,94 @@
+# --- General ---
+*.log
+*.pyc
+*.class
+*.swp
+.DS_Store
+
+# --- IDEs and Editors ---
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.history
+.atom/
+.svn/
+
+# --- Flutter/Dart/Pub ---
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+**/build/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+
+# --- Android ---
+android/app/debug/
+android/app/profile/
+android/app/release/
+
+# --- iOS ---
+ios/Flutter/.last_build_id
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Pods/
+ios/.symlinks/
+ios/Runner.xcworkspace/
+ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+
+# --- macOS ---
+macos/Flutter/ephemeral/
+macos/Pods/
+macos/.symlinks/
+macos/Runner.xcworkspace/
+macos/Runner.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+
+# --- Linux ---
+linux/flutter/ephemeral/
+
+# --- Windows ---
+windows/flutter/ephemeral/
+
+# --- Environment and Secrets ---
+.env
+*.env
+android/app/google-services.json
+invested/android/app/google-services.json
+backend/invested-hackathon-firebase-adminsdk-fbsvc-38735ba923.json
+ios/Runner/GoogleService-Info.plist
+
+# --- Python/Backend ---
+.venv/
+venv/
+backend/.venv/
+backend/venv/
+__pycache__/
+backend/__pycache__/
+.mypy_cache/
+backend/.mypy_cache/
+.pytest_cache/
+backend/.pytest_cache/
+backend/.env
+backend/*.env
+backend/*-secrets.json
+backend/*-service-account.json
+
+# --- Symbolication/Obfuscation ---
+app.*.symbols
+app.*.map.json
+
+# --- Miscellaneous ---
+migrate_working_dir/
+
+# --- Ignore root-level build output ---
+build/
+
+# --- Ignore log files ---
+*.log 

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -75,8 +77,40 @@ class SignInScreen extends StatelessWidget {
   }
 }
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String backendMessage = '';
+
+  Future<void> callBackend() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final idToken = await user?.getIdToken();
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'http://10.0.2.2:8000/protected',
+        ), // Use 10.0.2.2 for Android emulator
+        headers: {'Authorization': 'Bearer $idToken'},
+      );
+      setState(() {
+        if (response.statusCode == 200) {
+          backendMessage =
+              json.decode(response.body)['message'] ?? 'No message';
+        } else {
+          backendMessage = 'Error: ${response.statusCode}';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        backendMessage = 'Error: $e';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +126,19 @@ class HomeScreen extends StatelessWidget {
         ],
       ),
       body: Center(
-           child: Text('Welcome, ${user?.displayName ?? user?.email ?? "User"}!'),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Welcome, ${user?.displayName ?? user?.email ?? "User"}!'),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: callBackend,
+              child: const Text('Call Backend'),
+            ),
+            const SizedBox(height: 16),
+            Text(backendMessage),
+          ],
+        ),
       ),
     );
   }

@@ -2,9 +2,22 @@
 
 A cross-platform Flutter app for secure, AI-powered personal finance.
 
+## Project Structure
+
+```
+/ (project root)
+|-- invested/         # Flutter app (mobile frontend)
+|-- backend/          # FastAPI backend (Python)
+|   |-- main.py
+|   |-- requirements.txt
+|   |-- invested-hackathon-firebase-adminsdk-xxxx.json
+|-- README.md
+|-- .gitignore
+```
+
 ## Getting Started
 
-### Flutter App
+### Flutter App (Frontend)
 
 1. **Install dependencies:**
    ```
@@ -17,21 +30,22 @@ A cross-platform Flutter app for secure, AI-powered personal finance.
    ```
 
 3. **Firebase Setup:**
-   - Place your `google-services.json` in `android/app/`.
+   - Place your `google-services.json` in `invested/android/app/`.
    - Make sure your Firebase project is configured for Auth and Firestore.
 
-### Backend (FastAPI) — *optional, for future expansion*
+### Backend (FastAPI)
 
 1. **Install dependencies:**
    ```
    cd backend
-   python -m venv venv
-   source venv/bin/activate  # or venv\Scripts\activate on Windows
+   python -m venv .venv
+   .venv\Scripts\activate  # or source .venv/bin/activate on Mac/Linux
    pip install -r requirements.txt
    ```
 
-2. **Set up environment variables:**
-   - Copy `.env.example` to `.env` and fill in your secrets.
+2. **Service Account:**
+   - Download your Firebase service account JSON and place it in the `backend/` folder.
+   - Update the path in `main.py` if needed.
 
 3. **Run the backend:**
    ```

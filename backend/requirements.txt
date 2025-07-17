@@ -7,4 +7,4 @@ requests
 pydantic
 pyjwt
 cryptography
-python-dotenv 
+python-dotenv
