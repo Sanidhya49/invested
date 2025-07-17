@@ -86,15 +86,14 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String backendMessage = '';
+  Map<String, dynamic>? fetchedData;
 
   Future<void> callBackend() async {
     final user = FirebaseAuth.instance.currentUser;
     final idToken = await user?.getIdToken();
     try {
       final response = await http.get(
-        Uri.parse(
-          'http://10.0.2.2:8000/protected',
-        ), // Use 10.0.2.2 for Android emulator
+        Uri.parse('http://10.0.2.2:8000/protected'),
         headers: {'Authorization': 'Bearer $idToken'},
       );
       setState(() {
@@ -108,6 +107,28 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       setState(() {
         backendMessage = 'Error: $e';
+      });
+    }
+  }
+
+  Future<void> fetchData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final idToken = await user?.getIdToken();
+    try {
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:8000/fetch-data'),
+        headers: {'Authorization': 'Bearer $idToken'},
+      );
+      setState(() {
+        if (response.statusCode == 200) {
+          fetchedData = json.decode(response.body);
+        } else {
+          fetchedData = {'error': 'Status ${response.statusCode}'};
+        }
+      });
+    } catch (e) {
+      setState(() {
+        fetchedData = {'error': e.toString()};
       });
     }
   }
@@ -126,18 +147,36 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Welcome, ${user?.displayName ?? user?.email ?? "User"}!'),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: callBackend,
-              child: const Text('Call Backend'),
-            ),
-            const SizedBox(height: 16),
-            Text(backendMessage),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Welcome, ${user?.displayName ?? user?.email ?? "User"}!'),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: callBackend,
+                child: const Text('Call Backend'),
+              ),
+              const SizedBox(height: 16),
+              Text(backendMessage),
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: fetchData,
+                child: const Text('Fetch Financial Data'),
+              ),
+              const SizedBox(height: 16),
+              if (fetchedData != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  color: Colors.grey[200],
+                  width: double.infinity,
+                  child: Text(
+                    const JsonEncoder.withIndent('  ').convert(fetchedData),
+                    style: const TextStyle(fontFamily: 'monospace'),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
