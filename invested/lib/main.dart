@@ -87,6 +87,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String backendMessage = '';
   Map<String, dynamic>? fetchedData;
+  String oracleQuestion = '';
+  String? oracleAnswer;
+  bool isOracleLoading = false;
 
   Future<void> callBackend() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -133,6 +136,39 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> askOracle() async {
+    setState(() {
+      isOracleLoading = true;
+      oracleAnswer = null;
+    });
+    final user = FirebaseAuth.instance.currentUser;
+    final idToken = await user?.getIdToken();
+    try {
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:8000/ask-oracle'),
+        headers: {
+          'Authorization': 'Bearer $idToken',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({'question': oracleQuestion}),
+      );
+      setState(() {
+        isOracleLoading = false;
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          oracleAnswer = data['answer'] ?? 'No answer';
+        } else {
+          oracleAnswer = 'Error: ${response.statusCode}';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        isOracleLoading = false;
+        oracleAnswer = 'Error: $e';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -173,6 +209,47 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Text(
                     const JsonEncoder.withIndent('  ').convert(fetchedData),
                     style: const TextStyle(fontFamily: 'monospace'),
+                  ),
+                ),
+              const SizedBox(height: 32),
+              const Divider(),
+              const SizedBox(height: 16),
+              Text(
+                'Ask Oracle (AI):',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: TextField(
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Type your financial question',
+                  ),
+                  onChanged: (val) => oracleQuestion = val,
+                ),
+              ),
+              ElevatedButton(
+                onPressed: isOracleLoading ? null : askOracle,
+                child: isOracleLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Ask Oracle'),
+              ),
+              const SizedBox(height: 16),
+              if (oracleAnswer != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  color: Colors.blue[50],
+                  width: double.infinity,
+                  child: Text(
+                    oracleAnswer!,
+                    style: const TextStyle(fontSize: 16),
                   ),
                 ),
             ],

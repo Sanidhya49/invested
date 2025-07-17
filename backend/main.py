@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi import FastAPI, Depends, HTTPException, Header, Body
 import firebase_admin
 from firebase_admin import credentials, auth
 
@@ -41,4 +41,38 @@ def fetch_data(uid: str = Depends(verify_firebase_token)):
             {"name": "Axis Bluechip Fund", "1y_return": 11.2, "benchmark": 12.0},
             {"name": "Nippon India Growth", "1y_return": 9.5, "benchmark": 12.0}
         ]
+    }
+
+@app.post("/ask-oracle")
+def ask_oracle(
+    uid: str = Depends(verify_firebase_token),
+    body: dict = Body(...)
+):
+    question = body.get("question", "")
+    # Use the same mock data as /fetch-data
+    financial_data = {
+        "user_id": uid,
+        "assets": [
+            {"type": "bank_account", "name": "HDFC Savings", "balance": 120000},
+            {"type": "mutual_fund", "name": "Axis Bluechip Fund", "current_value": 45000, "returns_pct": 11.2},
+            {"type": "stock", "name": "TCS", "current_value": 32000, "shares": 10}
+        ],
+        "liabilities": [
+            {"type": "credit_card", "issuer": "HDFC", "outstanding": 8000},
+            {"type": "loan", "name": "Home Loan", "outstanding": 1200000}
+        ],
+        "net_worth": 134000,
+        "credit_score": 782,
+        "epf": 250000,
+        "sip_performance": [
+            {"name": "Axis Bluechip Fund", "1y_return": 11.2, "benchmark": 12.0},
+            {"name": "Nippon India Growth", "1y_return": 9.5, "benchmark": 12.0}
+        ]
+    }
+    # Mock AI response
+    answer = f"You asked: '{question}'. Based on your net worth of ₹{financial_data['net_worth']}, you are on track! (This is a mock answer.)"
+    return {
+        "question": question,
+        "answer": answer,
+        "data_used": financial_data
     }
