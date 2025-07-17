@@ -1,6 +1,11 @@
 from fastapi import FastAPI, Depends, HTTPException, Header, Body
 import firebase_admin
 from firebase_admin import credentials, auth
+from google.cloud import aiplatform
+from google.cloud.aiplatform.gapic import PredictionServiceClient
+from google.cloud.aiplatform.gapic.schema import predict
+from google.protobuf import struct_pb2
+import os
 
 app = FastAPI()
 
@@ -43,6 +48,21 @@ def fetch_data(uid: str = Depends(verify_firebase_token)):
         ]
     }
 
+def call_gemini(prompt, project, location, model="gemini-1.0-pro"):
+    client = PredictionServiceClient()
+    endpoint = f"projects/{project}/locations/{location}/publishers/google/models/{model}"
+
+    instance = struct_pb2.Value()
+    instance.struct_value.fields["prompt"].string_value = prompt
+
+    response = client.predict(
+        endpoint=endpoint,
+        instances=[instance],
+        parameters=struct_pb2.Value(),
+    )
+    return response.predictions[0]["content"]
+
+# In your ask_oracle endpoint:
 @app.post("/ask-oracle")
 def ask_oracle(
     uid: str = Depends(verify_firebase_token),
@@ -69,8 +89,25 @@ def ask_oracle(
             {"name": "Nippon India Growth", "1y_return": 9.5, "benchmark": 12.0}
         ]
     }
-    # Mock AI response
-    answer = f"You asked: '{question}'. Based on your net worth of ₹{financial_data['net_worth']}, you are on track! (This is a mock answer.)"
+
+    # Set up credentials and project/location
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(os.path.dirname(__file__), "invested-hackathon-firebase-adminsdk-fbsvc-38735ba923.json")
+    project = "invested-hackathon"
+    location = "us-central1"
+
+    # Compose the prompt for Gemini
+    prompt = (
+        f"You are a financial assistant. Here is the user's financial data:\n"
+        f"{financial_data}\n"
+        f"User's question: {question}\n"
+        f"Respond with a clear, actionable answer."
+    )
+
+    try:
+        answer = call_gemini(prompt, project, location)
+    except Exception as e:
+        answer = f"Error calling Gemini: {e}"
+
     return {
         "question": question,
         "answer": answer,
