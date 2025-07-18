@@ -79,7 +79,7 @@ backend/.env
 backend/*.env
 backend/*-secrets.json
 backend/*-service-account.json
-backend/invested-hackathon-vertex-ai.json
+backend/invested-hackathon-vertex-ai-key.json
 
 # --- Symbolication/Obfuscation ---
 app.*.symbols

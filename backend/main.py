@@ -14,8 +14,7 @@ app = FastAPI()
 cred = credentials.Certificate("invested-hackathon-firebase-adminsdk-fbsvc-38735ba923.json")
 firebase_admin.initialize_app(cred)
 
-# --- NEW: Vertex AI Initialization ---
-# This line tells the Google library where to find your downloaded key file
+# --- Vertex AI Initialization ---
 SERVICE_ACCOUNT_KEY_PATH = os.path.join(os.path.dirname(__file__), "invested-hackathon-vertex-ai-key.json")
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = SERVICE_ACCOUNT_KEY_PATH
 

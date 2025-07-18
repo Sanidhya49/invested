@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/services.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -203,6 +204,45 @@ class _HomeScreenState extends State<HomeScreen> {
               ElevatedButton(
                 onPressed: callBackend,
                 child: const Text('Call Backend'),
+              ),
+              const SizedBox(height: 16),
+              // TEMP: Show Firebase ID Token button
+              ElevatedButton(
+                onPressed: () async {
+                  String? idToken = await FirebaseAuth.instance.currentUser
+                      ?.getIdToken();
+                  print('Your Firebase ID Token: $idToken');
+                  showDialog(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text('Firebase ID Token'),
+                      content: SingleChildScrollView(
+                        child: SelectableText(idToken ?? 'No token'),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Clipboard.setData(
+                              ClipboardData(text: idToken ?? ''),
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Token copied to clipboard!'),
+                              ),
+                            );
+                            Navigator.of(context).pop();
+                          },
+                          child: const Text('Copy & Close'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Close'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                child: const Text('Show Firebase ID Token'),
               ),
               const SizedBox(height: 16),
               Text(backendMessage),
