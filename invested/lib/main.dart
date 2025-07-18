@@ -107,26 +107,52 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Invested')),
-      body: _screens[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            label: 'Oracle',
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFe0eafc), Color(0xFFcfdef3)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: Row(
+            children: [
+              const Icon(
+                Icons.account_balance_wallet_rounded,
+                color: Colors.deepPurple,
+              ),
+              const SizedBox(width: 8),
+              const Text('Invested'),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications_active_outlined),
-            label: 'Alerts',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.trending_up),
-            label: 'Opportunities',
-          ),
-        ],
+          backgroundColor: Colors.white.withOpacity(0.95),
+          elevation: 2,
+        ),
+        body: _screens[_selectedIndex],
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+          selectedItemColor: Colors.deepPurple,
+          unselectedItemColor: Colors.grey,
+          backgroundColor: Colors.white,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.chat_bubble_outline),
+              label: 'Oracle',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.notifications_active_outlined),
+              label: 'Alerts',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.trending_up),
+              label: 'Opportunities',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -138,10 +164,24 @@ class OracleChatScreen extends StatefulWidget {
   State<OracleChatScreen> createState() => _OracleChatScreenState();
 }
 
-class _OracleChatScreenState extends State<OracleChatScreen> {
+class _OracleChatScreenState extends State<OracleChatScreen>
+    with TickerProviderStateMixin {
   String oracleQuestion = '';
   bool isOracleLoading = false;
   List<Map<String, String>> oracleChat = [];
+  final ScrollController _scrollController = ScrollController();
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
   Future<void> askOracle() async {
     if (oracleQuestion.trim().isEmpty) return;
@@ -149,6 +189,7 @@ class _OracleChatScreenState extends State<OracleChatScreen> {
       isOracleLoading = true;
       oracleChat.add({'role': 'user', 'text': oracleQuestion});
     });
+    _scrollToBottom();
     final user = FirebaseAuth.instance.currentUser;
     final idToken = await user?.getIdToken();
     try {
@@ -176,12 +217,14 @@ class _OracleChatScreenState extends State<OracleChatScreen> {
         }
         oracleQuestion = '';
       });
+      _scrollToBottom();
     } catch (e) {
       setState(() {
         isOracleLoading = false;
         oracleChat.add({'role': 'oracle', 'text': 'Error: $e'});
         oracleQuestion = '';
       });
+      _scrollToBottom();
     }
   }
 
@@ -189,77 +232,148 @@ class _OracleChatScreenState extends State<OracleChatScreen> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     return Center(
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Welcome, ${user?.displayName ?? user?.email ?? "User"}!'),
-            const SizedBox(height: 32),
-            const Divider(),
-            const SizedBox(height: 16),
-            Text('Oracle Chat', style: Theme.of(context).textTheme.titleMedium),
-            Container(
-              height: 300,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: 16),
+          CircleAvatar(
+            radius: 32,
+            backgroundColor: Colors.deepPurple[100],
+            child: const Icon(
+              Icons.account_circle,
+              size: 48,
+              color: Colors.deepPurple,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Welcome, ${user?.displayName ?? user?.email ?? "User"}!',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
               child: ListView.builder(
+                controller: _scrollController,
                 itemCount: oracleChat.length,
                 itemBuilder: (context, index) {
                   final msg = oracleChat[index];
                   final isUser = msg['role'] == 'user';
-                  return Align(
-                    alignment: isUser
-                        ? Alignment.centerRight
-                        : Alignment.centerLeft,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isUser ? Colors.green[100] : Colors.blue[50],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        msg['text'] ?? '',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: isUser ? Colors.black87 : Colors.blue[900],
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeInOut,
+                    margin: const EdgeInsets.symmetric(
+                      vertical: 6,
+                      horizontal: 8,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: isUser
+                          ? MainAxisAlignment.end
+                          : MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (!isUser)
+                          CircleAvatar(
+                            backgroundColor: Colors.deepPurple[200],
+                            child: const Icon(
+                              Icons.smart_toy,
+                              color: Colors.white,
+                            ),
+                          ),
+                        if (!isUser) const SizedBox(width: 8),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: isUser
+                                  ? Colors.deepPurple[100]
+                                  : Colors.blue[50],
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.08),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              msg['text'] ?? '',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: isUser
+                                    ? Colors.black87
+                                    : Colors.blue[900],
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        if (isUser) const SizedBox(width: 8),
+                        if (isUser)
+                          CircleAvatar(
+                            backgroundColor: Colors.green[200],
+                            child: const Icon(
+                              Icons.person,
+                              color: Colors.white,
+                            ),
+                          ),
+                      ],
                     ),
                   );
                 },
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        labelText: 'Type your financial question',
-                      ),
-                      onChanged: (val) => oracleQuestion = val,
-                      onSubmitted: (_) => askOracle(),
-                      controller: TextEditingController(text: oracleQuestion),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'Type your financial question',
+                      filled: true,
+                      fillColor: Colors.white,
                     ),
+                    onChanged: (val) => oracleQuestion = val,
+                    onSubmitted: (_) => askOracle(),
+                    controller: TextEditingController(text: oracleQuestion),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: isOracleLoading ? null : askOracle,
-                    child: isOracleLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.send),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: isOracleLoading
+                      ? const SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : FloatingActionButton(
+                          mini: true,
+                          backgroundColor: Colors.deepPurple,
+                          onPressed: askOracle,
+                          child: const Icon(Icons.send, color: Colors.white),
+                        ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+        ],
       ),
     );
   }
@@ -345,18 +459,55 @@ class _GuardianAlertsScreenState extends State<GuardianAlertsScreen> {
           if (error.isNotEmpty)
             Text(error, style: const TextStyle(color: Colors.red)),
           ...alerts.map(
-            (alert) => Card(
-              color: alert['severity'] == 'critical'
-                  ? Colors.red[100]
-                  : alert['severity'] == 'moderate'
-                  ? Colors.yellow[100]
-                  : Colors.green[100],
-              child: ListTile(
-                title: Text(alert['type'] ?? 'Alert'),
-                subtitle: Text(alert['description'] ?? ''),
-                trailing: Text(
-                  alert['severity']?.toUpperCase() ?? '',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+            (alert) => AnimatedContainer(
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeInOut,
+              child: Card(
+                elevation: 3,
+                color: alert['severity'] == 'critical'
+                    ? Colors.red[100]
+                    : alert['severity'] == 'moderate'
+                    ? Colors.yellow[100]
+                    : Colors.green[100],
+                child: ListTile(
+                  leading: Icon(
+                    alert['severity'] == 'critical'
+                        ? Icons.warning_amber_rounded
+                        : alert['severity'] == 'moderate'
+                        ? Icons.error_outline
+                        : Icons.check_circle_outline,
+                    color: alert['severity'] == 'critical'
+                        ? Colors.red
+                        : alert['severity'] == 'moderate'
+                        ? Colors.orange
+                        : Colors.green,
+                  ),
+                  title: Text(
+                    alert['type'] ?? 'Alert',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(alert['description'] ?? ''),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: alert['severity'] == 'critical'
+                          ? Colors.red[300]
+                          : alert['severity'] == 'moderate'
+                          ? Colors.orange[200]
+                          : Colors.green[200],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      alert['severity']?.toUpperCase() ?? '',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -451,14 +602,41 @@ class _CatalystOpportunitiesScreenState
           if (error.isNotEmpty)
             Text(error, style: const TextStyle(color: Colors.red)),
           ...opportunities.map(
-            (opp) => Card(
-              color: Colors.blue[50],
-              child: ListTile(
-                title: Text(opp['title'] ?? 'Opportunity'),
-                subtitle: Text(opp['description'] ?? ''),
-                trailing: Text(
-                  opp['category']?.toUpperCase() ?? '',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+            (opp) => AnimatedContainer(
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeInOut,
+              child: Card(
+                elevation: 3,
+                color: Colors.blue[50],
+                child: ListTile(
+                  leading: Icon(
+                    Icons.lightbulb_outline,
+                    color: Colors.blue[700],
+                  ),
+                  title: Text(
+                    opp['title'] ?? 'Opportunity',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(opp['description'] ?? ''),
+                  trailing: opp['category'] != null
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue[200],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            opp['category']?.toUpperCase() ?? '',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        )
+                      : null,
                 ),
               ),
             ),
