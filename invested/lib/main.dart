@@ -5,7 +5,9 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart'; // Required for opening links
 
+// --- Main Application Setup ---
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
@@ -21,12 +23,14 @@ class InvestedApp extends StatelessWidget {
       title: 'Invested',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
       ),
       home: const AuthGate(),
     );
   }
 }
 
+// --- Authentication Gate ---
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -49,35 +53,75 @@ class AuthGate extends StatelessWidget {
   }
 }
 
+// --- Sign In Screen ---
 class SignInScreen extends StatelessWidget {
   const SignInScreen({super.key});
 
   Future<void> _signInWithGoogle() async {
-    final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-    final GoogleSignInAuthentication? googleAuth =
-        await googleUser?.authentication;
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth?.accessToken,
-      idToken: googleAuth?.idToken,
-    );
-    await FirebaseAuth.instance.signInWithCredential(credential);
+    try {
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) {
+        return;
+      }
+      final GoogleSignInAuthentication? googleAuth =
+          await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth?.accessToken,
+        idToken: googleAuth?.idToken,
+      );
+      await FirebaseAuth.instance.signInWithCredential(credential);
+    } catch (e) {
+      print("Sign-in error: $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Invested - Sign In')),
-      body: Center(
-        child: ElevatedButton.icon(
-          icon: const Icon(Icons.login),
-          label: const Text('Sign in with Google'),
-          onPressed: _signInWithGoogle,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFe0eafc), Color(0xFFcfdef3)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.account_balance_wallet_rounded,
+                  size: 80, color: Colors.deepPurple),
+              const SizedBox(height: 16),
+              Text(
+                'Welcome to Invested',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Your Personal Financial Co-Pilot',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 48),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  textStyle: const TextStyle(fontSize: 18),
+                ),
+                icon: const Icon(Icons.login),
+                label: const Text('Sign in with Google'),
+                onPressed: _signInWithGoogle,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
+// --- Main Home Screen with Bottom Navigation ---
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -87,17 +131,12 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
-  final List<Widget> _screens = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _screens.addAll([
-      OracleChatScreen(),
-      GuardianAlertsScreen(),
-      CatalystOpportunitiesScreen(),
-    ]);
-  }
+  final List<Widget> _screens = [
+    OracleChatScreen(),
+    GuardianAlertsScreen(),
+    CatalystOpportunitiesScreen(),
+    ProfileScreen(),
+  ];
 
   void _onItemTapped(int index) {
     setState(() {
@@ -120,10 +159,8 @@ class _HomeScreenState extends State<HomeScreen> {
         appBar: AppBar(
           title: Row(
             children: [
-              const Icon(
-                Icons.account_balance_wallet_rounded,
-                color: Colors.deepPurple,
-              ),
+              const Icon(Icons.account_balance_wallet_rounded,
+                  color: Colors.deepPurple),
               const SizedBox(width: 8),
               const Text('Invested'),
             ],
@@ -131,13 +168,17 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: Colors.white.withOpacity(0.95),
           elevation: 2,
         ),
-        body: _screens[_selectedIndex],
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: _screens,
+        ),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
           selectedItemColor: Colors.deepPurple,
           unselectedItemColor: Colors.grey,
           backgroundColor: Colors.white,
+          type: BottomNavigationBarType.fixed,
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.chat_bubble_outline),
@@ -151,6 +192,10 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Icon(Icons.trending_up),
               label: 'Opportunities',
             ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              label: 'Profile',
+            ),
           ],
         ),
       ),
@@ -158,15 +203,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// Oracle Chat Tab
+// --- Oracle Chat Tab ---
+// ... (This screen remains the same as your current version)
 class OracleChatScreen extends StatefulWidget {
+  const OracleChatScreen({super.key});
   @override
   State<OracleChatScreen> createState() => _OracleChatScreenState();
 }
 
 class _OracleChatScreenState extends State<OracleChatScreen>
     with TickerProviderStateMixin {
-  String oracleQuestion = '';
+  final TextEditingController _textController = TextEditingController();
   bool isOracleLoading = false;
   List<Map<String, String>> oracleChat = [];
   final ScrollController _scrollController = ScrollController();
@@ -184,10 +231,13 @@ class _OracleChatScreenState extends State<OracleChatScreen>
   }
 
   Future<void> askOracle() async {
-    if (oracleQuestion.trim().isEmpty) return;
+    final question = _textController.text;
+    if (question.trim().isEmpty) return;
+    _textController.clear();
+
     setState(() {
       isOracleLoading = true;
-      oracleChat.add({'role': 'user', 'text': oracleQuestion});
+      oracleChat.add({'role': 'user', 'text': question});
     });
     _scrollToBottom();
     final user = FirebaseAuth.instance.currentUser;
@@ -199,188 +249,149 @@ class _OracleChatScreenState extends State<OracleChatScreen>
           'Authorization': 'Bearer $idToken',
           'Content-Type': 'application/json',
         },
-        body: json.encode({'question': oracleQuestion}),
+        body: json.encode({'question': question}),
       );
-      setState(() {
-        isOracleLoading = false;
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          oracleChat.add({
-            'role': 'oracle',
-            'text': data['answer'] ?? 'No answer',
-          });
-        } else {
-          oracleChat.add({
-            'role': 'oracle',
-            'text': 'Error: ${response.statusCode}',
-          });
-        }
-        oracleQuestion = '';
-      });
-      _scrollToBottom();
+      if(mounted) {
+        setState(() {
+          if (response.statusCode == 200) {
+            final data = json.decode(response.body);
+            oracleChat.add({
+              'role': 'oracle',
+              'text': data['answer'] ?? 'No answer received.',
+            });
+          } else {
+            oracleChat.add({
+              'role': 'oracle',
+              'text': 'Error: ${response.statusCode}',
+            });
+          }
+        });
+      }
     } catch (e) {
-      setState(() {
-        isOracleLoading = false;
-        oracleChat.add({'role': 'oracle', 'text': 'Error: $e'});
-        oracleQuestion = '';
-      });
+      if(mounted) {
+        setState(() {
+          oracleChat.add({'role': 'oracle', 'text': 'Error: $e'});
+        });
+      }
+    } finally {
+      if(mounted) {
+        setState(() {
+          isOracleLoading = false;
+        });
+      }
       _scrollToBottom();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 16),
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: Colors.deepPurple[100],
-            child: const Icon(
-              Icons.account_circle,
-              size: 48,
-              color: Colors.deepPurple,
+    return Column(
+      children: [
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.8),
+              borderRadius: BorderRadius.circular(16),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Welcome, ${user?.displayName ?? user?.email ?? "User"}!',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: ListView.builder(
-                controller: _scrollController,
-                itemCount: oracleChat.length,
-                itemBuilder: (context, index) {
-                  final msg = oracleChat[index];
-                  final isUser = msg['role'] == 'user';
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 400),
-                    curve: Curves.easeInOut,
-                    margin: const EdgeInsets.symmetric(
-                      vertical: 6,
-                      horizontal: 8,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: isUser
-                          ? MainAxisAlignment.end
-                          : MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        if (!isUser)
-                          CircleAvatar(
-                            backgroundColor: Colors.deepPurple[200],
-                            child: const Icon(
-                              Icons.smart_toy,
-                              color: Colors.white,
-                            ),
-                          ),
-                        if (!isUser) const SizedBox(width: 8),
-                        Flexible(
-                          child: Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: isUser
-                                  ? Colors.deepPurple[100]
-                                  : Colors.blue[50],
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.08),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Text(
-                              msg['text'] ?? '',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: isUser
-                                    ? Colors.black87
-                                    : Colors.blue[900],
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (isUser) const SizedBox(width: 8),
-                        if (isUser)
-                          CircleAvatar(
-                            backgroundColor: Colors.green[200],
-                            child: const Icon(
-                              Icons.person,
-                              color: Colors.white,
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      labelText: 'Type your financial question',
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    onChanged: (val) => oracleQuestion = val,
-                    onSubmitted: (_) => askOracle(),
-                    controller: TextEditingController(text: oracleQuestion),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: isOracleLoading
-                      ? const SizedBox(
-                          width: 32,
-                          height: 32,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : FloatingActionButton(
-                          mini: true,
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(8.0),
+              itemCount: oracleChat.length,
+              itemBuilder: (context, index) {
+                final msg = oracleChat[index];
+                final isUser = msg['role'] == 'user';
+                return Container(
+                  margin:
+                      const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                  child: Row(
+                    mainAxisAlignment:
+                        isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (!isUser)
+                        const CircleAvatar(
                           backgroundColor: Colors.deepPurple,
-                          onPressed: askOracle,
-                          child: const Icon(Icons.send, color: Colors.white),
+                          child: Icon(Icons.smart_toy,
+                              color: Colors.white, size: 20),
                         ),
-                ),
-              ],
+                      if (!isUser) const SizedBox(width: 8),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color:
+                                isUser ? Colors.deepPurple[100] : Colors.blue[50],
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: SelectableText(
+                            msg['text'] ?? '',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color:
+                                  isUser ? Colors.black87 : Colors.blue[900],
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (isUser) const SizedBox(width: 8),
+                      if (isUser)
+                        CircleAvatar(
+                          backgroundColor: Colors.green[200],
+                          child: const Icon(Icons.person, color: Colors.white),
+                        ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
-          const SizedBox(height: 12),
-        ],
-      ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _textController,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12.0)),
+                    ),
+                    labelText: 'Ask Oracle a question...',
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  onSubmitted: (_) => askOracle(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: isOracleLoading
+                    ? const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: CircularProgressIndicator(),
+                      )
+                    : FloatingActionButton(
+                        backgroundColor: Colors.deepPurple,
+                        onPressed: askOracle,
+                        child: const Icon(Icons.send, color: Colors.white),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
 
-// Guardian Alerts Tab
+
+// --- Guardian Alerts Tab ---
+// ... (This screen remains the same as your current version)
 class GuardianAlertsScreen extends StatefulWidget {
+  const GuardianAlertsScreen({super.key});
   @override
   State<GuardianAlertsScreen> createState() => _GuardianAlertsScreenState();
 }
@@ -391,6 +402,7 @@ class _GuardianAlertsScreenState extends State<GuardianAlertsScreen> {
   String error = '';
 
   Future<void> fetchAlerts() async {
+    if (isLoading) return;
     setState(() {
       isLoading = true;
       error = '';
@@ -406,35 +418,40 @@ class _GuardianAlertsScreenState extends State<GuardianAlertsScreen> {
         },
         body: '{}',
       );
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        // Try to parse the alerts as JSON if possible
-        try {
-          final parsed = json.decode(
-            data['alerts'].replaceAll("```json", '').replaceAll("```", ''),
-          );
+      if (mounted) {
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          try {
+            final parsed = json.decode(
+                data['alerts'].replaceAll("```json", '').replaceAll("```", ''));
+            setState(() {
+              alerts = parsed['alerts'] ?? [];
+            });
+          } catch (_) {
+            setState(() {
+              alerts = [];
+              error = 'Could not parse alerts from the AI.';
+            });
+          }
+        } else {
           setState(() {
-            alerts = parsed['alerts'] ?? [];
-          });
-        } catch (_) {
-          setState(() {
-            alerts = [];
-            error = 'Could not parse alerts.';
+            error = 'Error from server: ${response.statusCode}';
           });
         }
-      } else {
-        setState(() {
-          error = 'Error: ${response.statusCode}';
-        });
       }
     } catch (e) {
-      setState(() {
-        error = 'Error: $e';
-      });
+      if (mounted) {
+        setState(() {
+          error = 'Failed to fetch alerts: $e';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
-    setState(() {
-      isLoading = false;
-    });
   }
 
   @override
@@ -443,72 +460,61 @@ class _GuardianAlertsScreenState extends State<GuardianAlertsScreen> {
     fetchAlerts();
   }
 
+  Color _getSeverityColor(String? severity) {
+    switch (severity?.toLowerCase()) {
+      case 'critical':
+        return Colors.red[100]!;
+      case 'moderate':
+        return Colors.orange[100]!;
+      default:
+        return Colors.green[100]!;
+    }
+  }
+
+  IconData _getSeverityIcon(String? severity) {
+    switch (severity?.toLowerCase()) {
+      case 'critical':
+        return Icons.warning_amber_rounded;
+      case 'moderate':
+        return Icons.error_outline;
+      default:
+        return Icons.check_circle_outline;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
-      onRefresh: () async => fetchAlerts(),
+      onRefresh: fetchAlerts,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Text(
             'Guardian Alerts',
-            style: Theme.of(context).textTheme.titleLarge,
+            style: Theme.of(context).textTheme.headlineSmall,
           ),
-          const SizedBox(height: 16),
-          if (isLoading) const Center(child: CircularProgressIndicator()),
+          const SizedBox(height: 8),
+          const Text('Proactive alerts about your financial health.'),
+          const SizedBox(height: 24),
+          if (isLoading && alerts.isEmpty)
+            const Center(child: CircularProgressIndicator()),
           if (error.isNotEmpty)
-            Text(error, style: const TextStyle(color: Colors.red)),
+            Center(
+                child: Text(error, style: const TextStyle(color: Colors.red))),
+          if (!isLoading && alerts.isEmpty && error.isEmpty)
+            const Center(child: Text("No alerts found. You're all clear!")),
           ...alerts.map(
-            (alert) => AnimatedContainer(
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeInOut,
-              child: Card(
-                elevation: 3,
-                color: alert['severity'] == 'critical'
-                    ? Colors.red[100]
-                    : alert['severity'] == 'moderate'
-                    ? Colors.yellow[100]
-                    : Colors.green[100],
-                child: ListTile(
-                  leading: Icon(
-                    alert['severity'] == 'critical'
-                        ? Icons.warning_amber_rounded
-                        : alert['severity'] == 'moderate'
-                        ? Icons.error_outline
-                        : Icons.check_circle_outline,
-                    color: alert['severity'] == 'critical'
-                        ? Colors.red
-                        : alert['severity'] == 'moderate'
-                        ? Colors.orange
-                        : Colors.green,
-                  ),
-                  title: Text(
-                    alert['type'] ?? 'Alert',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(alert['description'] ?? ''),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: alert['severity'] == 'critical'
-                          ? Colors.red[300]
-                          : alert['severity'] == 'moderate'
-                          ? Colors.orange[200]
-                          : Colors.green[200],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      alert['severity']?.toUpperCase() ?? '',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
+            (alert) => Card(
+              elevation: 3,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              color: _getSeverityColor(alert['severity']),
+              child: ListTile(
+                leading:
+                    Icon(_getSeverityIcon(alert['severity']), size: 40),
+                title: Text(alert['type'] ?? 'Alert',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(alert['description'] ?? ''),
+                isThreeLine: true,
               ),
             ),
           ),
@@ -518,8 +524,10 @@ class _GuardianAlertsScreenState extends State<GuardianAlertsScreen> {
   }
 }
 
-// Catalyst Opportunities Tab
+// --- Catalyst Opportunities Tab ---
+// ... (This screen remains the same as your current version)
 class CatalystOpportunitiesScreen extends StatefulWidget {
+  const CatalystOpportunitiesScreen({super.key});
   @override
   State<CatalystOpportunitiesScreen> createState() =>
       _CatalystOpportunitiesScreenState();
@@ -532,6 +540,7 @@ class _CatalystOpportunitiesScreenState
   String error = '';
 
   Future<void> fetchOpportunities() async {
+    if (isLoading) return;
     setState(() {
       isLoading = true;
       error = '';
@@ -547,37 +556,41 @@ class _CatalystOpportunitiesScreenState
         },
         body: '{}',
       );
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        // Try to parse the opportunities as JSON if possible
-        try {
-          final parsed = json.decode(
-            data['opportunities']
+      if (mounted) {
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          try {
+            final parsed = json.decode(data['opportunities']
                 .replaceAll("```json", '')
-                .replaceAll("```", ''),
-          );
+                .replaceAll("```", ''));
+            setState(() {
+              opportunities = parsed['opportunities'] ?? [];
+            });
+          } catch (_) {
+            setState(() {
+              opportunities = [];
+              error = 'Could not parse opportunities from the AI.';
+            });
+          }
+        } else {
           setState(() {
-            opportunities = parsed['opportunities'] ?? [];
-          });
-        } catch (_) {
-          setState(() {
-            opportunities = [];
-            error = 'Could not parse opportunities.';
+            error = 'Error from server: ${response.statusCode}';
           });
         }
-      } else {
-        setState(() {
-          error = 'Error: ${response.statusCode}';
-        });
       }
     } catch (e) {
-      setState(() {
-        error = 'Error: $e';
-      });
+      if (mounted) {
+        setState(() {
+          error = 'Failed to fetch opportunities: $e';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
-    setState(() {
-      isLoading = false;
-    });
   }
 
   @override
@@ -589,60 +602,158 @@ class _CatalystOpportunitiesScreenState
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
-      onRefresh: () async => fetchOpportunities(),
+      onRefresh: fetchOpportunities,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Text(
             'Catalyst Opportunities',
-            style: Theme.of(context).textTheme.titleLarge,
+            style: Theme.of(context).textTheme.headlineSmall,
           ),
-          const SizedBox(height: 16),
-          if (isLoading) const Center(child: CircularProgressIndicator()),
+          const SizedBox(height: 8),
+          const Text('Actionable suggestions to improve your finances.'),
+          const SizedBox(height: 24),
+          if (isLoading && opportunities.isEmpty)
+            const Center(child: CircularProgressIndicator()),
           if (error.isNotEmpty)
-            Text(error, style: const TextStyle(color: Colors.red)),
+            Center(
+                child: Text(error, style: const TextStyle(color: Colors.red))),
+          if (!isLoading && opportunities.isEmpty && error.isEmpty)
+            const Center(child: Text("No new opportunities found right now.")),
           ...opportunities.map(
-            (opp) => AnimatedContainer(
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeInOut,
-              child: Card(
-                elevation: 3,
-                color: Colors.blue[50],
-                child: ListTile(
-                  leading: Icon(
-                    Icons.lightbulb_outline,
-                    color: Colors.blue[700],
-                  ),
-                  title: Text(
-                    opp['title'] ?? 'Opportunity',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(opp['description'] ?? ''),
-                  trailing: opp['category'] != null
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.blue[200],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            opp['category']?.toUpperCase() ?? '',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        )
-                      : null,
-                ),
+            (opp) => Card(
+              elevation: 3,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              color: Colors.blue[50],
+              child: ListTile(
+                leading: Icon(Icons.lightbulb_outline,
+                    color: Colors.blue[700], size: 40),
+                title: Text(opp['title'] ?? 'Opportunity',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(opp['description'] ?? ''),
+                isThreeLine: true,
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+
+// --- UPDATED: Profile Screen Tab ---
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+
+  // THIS IS THE NEW FUNCTION THAT PERFORMS THE REAL AUTHENTICATION FLOW
+// In ProfileScreen in your main.dart
+
+void _connectToFi(BuildContext context) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+  final idToken = await user.getIdToken();
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => const Center(child: CircularProgressIndicator()),
+  );
+
+  try {
+    final response = await http.get(
+      Uri.parse('http://10.0.2.2:8000/start-fi-auth'),
+      headers: {'Authorization': 'Bearer $idToken'},
+    );
+    
+    // Always pop the dialog once the request is done
+    Navigator.pop(context); 
+
+    if (response.statusCode == 200) {
+      final authUrl = json.decode(response.body)['auth_url'];
+      final uri = Uri.parse(authUrl);
+
+      // Check if the URL can be launched
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        print("Could not launch $uri"); // ADD THIS ERROR LOG
+        // Optionally show an error to the user
+      }
+    } else {
+      print("Error from backend: ${response.statusCode}"); // ADD THIS
+    }
+  } catch (e) {
+    Navigator.pop(context);
+    print("Error in _connectToFi: $e"); // ADD THIS
+  }
+}
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    return ListView(
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        Card(
+          elevation: 4,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: Colors.deepPurple[100],
+                  child: Text(
+                    user?.displayName?.substring(0, 1).toUpperCase() ?? 'U',
+                    style: const TextStyle(
+                        fontSize: 24, color: Colors.deepPurple),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user?.displayName ?? 'User Name',
+                        style: Theme.of(context).textTheme.titleLarge,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        user?.email ?? 'user@email.com',
+                        style: Theme.of(context).textTheme.bodySmall,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        const Text("Settings", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const Divider(),
+        ListTile(
+          leading: const Icon(Icons.link_rounded, color: Colors.deepPurple),
+          title: const Text('Connect Financial Accounts'),
+          subtitle: const Text('via Fi Money (MCP)'),
+          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+          onTap: () => _connectToFi(context), // THIS NOW CALLS THE REAL FLOW
+        ),
+        const Divider(),
+        ListTile(
+          leading: const Icon(Icons.logout, color: Colors.red),
+          title: const Text('Logout'),
+          onTap: () {
+            FirebaseAuth.instance.signOut();
+          },
+        ),
+      ],
     );
   }
 }
