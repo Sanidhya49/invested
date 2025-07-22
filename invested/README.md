@@ -6,21 +6,24 @@ A cross-platform Flutter app for secure, AI-powered personal finance.
 
 ```
 / (project root)
-|-- invested/         # Flutter app (mobile frontend)
-|-- backend/          # FastAPI backend (Python)
+|-- invested/                 # Main Flutter app (mobile frontend)
+|-- backend/                  # Main FastAPI backend (Python)
 |   |-- main.py
 |   |-- requirements.txt
 |   |-- invested-hackathon-firebase-adminsdk-xxxx.json
+|-- frontend_aditi/           # (Extra) Experimental Flutter project, not part of main app
+|-- invested-backend-aditi/   # (Extra) Experimental backend, not part of main app
 |-- README.md
 |-- .gitignore
 ```
 
 ## Getting Started
 
-### Flutter App (Frontend)
+### Flutter App (invested/)
 
 1. **Install dependencies:**
    ```
+   cd invested
    flutter pub get
    ```
 
@@ -33,7 +36,7 @@ A cross-platform Flutter app for secure, AI-powered personal finance.
    - Place your `google-services.json` in `invested/android/app/`.
    - Make sure your Firebase project is configured for Auth and Firestore.
 
-### Backend (FastAPI)
+### Backend (backend/)
 
 1. **Install dependencies:**
    ```

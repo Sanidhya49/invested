@@ -45,7 +45,6 @@ def start_fi_auth(uid: str = Depends(verify_firebase_token)):
 
 # --- Dynamic Data Fetching ---
 def get_user_financial_data(uid: str, tool_name: str):
-    # ... (This function remains the same as before)
     try:
         db = firestore.client()
         user_doc = db.collection("users").document(uid).get()
@@ -64,26 +63,18 @@ def get_user_financial_data(uid: str, tool_name: str):
 
 # --- NEW: Tool Definition for the Strategist Agent ---
 def get_market_performance(stock_symbols: list):
-    """
-    A mock tool that simulates fetching real-time stock performance data.
-    In a real app, this would call a live financial API.
-    """
     print(f"TOOL CALLED: get_market_performance for symbols: {stock_symbols}")
     performance_data = {}
-    # NIFTY 50 benchmark
-    performance_data["NIFTY 50"] = {"1y_return": 12.0} 
+    performance_data["NIFTY 50"] = {"1y_return": 12.0}
     for symbol in stock_symbols:
-        # Generate mock performance data
         if "RELIANCE" in symbol:
-            performance_data[symbol] = {"1y_return": 15.5} # Outperforming
+            performance_data[symbol] = {"1y_return": 15.5}
         elif "TCS" in symbol:
-            performance_data[symbol] = {"1y_return": 11.0} # Underperforming
+            performance_data[symbol] = {"1y_return": 11.0}
         else:
-            performance_data[symbol] = {"1y_return": 13.0} # Slightly outperforming
-            
+            performance_data[symbol] = {"1y_return": 13.0}
     return json.dumps(performance_data)
 
-# Describe the tool to the Gemini model
 market_data_tool = Tool(
     function_declarations=[
         FunctionDeclaration(
@@ -108,16 +99,11 @@ market_data_tool = Tool(
 def call_gemini_text(prompt: str, model_name="gemini-2.5-flash", tools=None):
     model = GenerativeModel(model_name, tools=tools)
     response = model.generate_content(prompt)
-    
-    # Check if the model wants to call a tool
     if response.candidates[0].function_calls:
         function_call = response.candidates[0].function_calls[0]
         if function_call.name == "get_market_performance":
-            # Execute the function
             args = {key: value for key, value in function_call.args.items()}
             tool_result = get_market_performance(**args)
-            
-            # Send the result back to the model
             final_response = model.generate_content(
                 Part.from_function_response(
                     name="get_market_performance",
@@ -125,7 +111,6 @@ def call_gemini_text(prompt: str, model_name="gemini-2.5-flash", tools=None):
                 )
             )
             return final_response.text
-
     return response.text
 
 # --- Agent Endpoints ---
@@ -134,7 +119,6 @@ def ask_oracle(uid: str = Depends(verify_firebase_token), body: dict = Body(...)
     question = body.get("question", "")
     financial_data = get_user_financial_data(uid, tool_name="fetch_net_worth")
     prompt = (f"You are Oracle... User's question: '{question}'\nData:\n{financial_data}")
-    # ... (rest of the logic)
     return {"question": question, "answer": call_gemini_text(prompt)}
 
 @app.post("/run-guardian")
@@ -143,7 +127,6 @@ def run_guardian(uid: str = Depends(verify_firebase_token), body: dict = Body(No
     credit = get_user_financial_data(uid, tool_name="fetch_credit_report")
     data = {"transactions": transactions, "credit_report": credit}
     prompt = ("You are Guardian... Respond ONLY in JSON...\n" f"Data:\n{data}")
-    # ... (rest of the logic)
     return {"alerts": call_gemini_text(prompt)}
 
 @app.post("/run-catalyst")
@@ -152,14 +135,11 @@ def run_catalyst(uid: str = Depends(verify_firebase_token), body: dict = Body(No
     epf = get_user_financial_data(uid, tool_name="fetch_epf_details")
     data = {"net_worth_summary": net_worth, "epf_details": epf}
     prompt = ("You are Catalyst... Respond ONLY in JSON...\n" f"Data:\n{data}")
-    # ... (rest of the logic)
     return {"opportunities": call_gemini_text(prompt)}
 
-# --- NEW STRATEGIST AGENT ENDPOINT ---
 @app.post("/run-strategist")
 def run_strategist(uid: str = Depends(verify_firebase_token), body: dict = Body(None)):
     stock_data = get_user_financial_data(uid, tool_name="fetch_stock_transactions")
-    
     prompt = (
         "You are an expert Investment Strategist for the Indian market. "
         "1. Analyze the user's stock portfolio provided below. "
@@ -171,11 +151,8 @@ def run_strategist(uid: str = Depends(verify_firebase_token), body: dict = Body(
         "`{\"summary\": \"...\", \"recommendations\": [{\"symbol\": \"...\", \"advice\": \"...\", \"reasoning\": \"...\"}]}`.\n"
         f"User's Stock Portfolio:\n```json\n{stock_data}\n```"
     )
-    
     try:
-        # Pass the tool to the Gemini model
         answer = call_gemini_text(prompt, tools=[market_data_tool])
     except Exception as e:
         answer = f"Error calling Gemini: {e}"
-        
     return {"strategy": answer}

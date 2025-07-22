@@ -1,1 +1,21 @@
+# Python virtual environments
+.venv/
+venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+
+# Environment and secrets
+.env
+*.env
+*-secrets.json
+*-service-account.json
 service-account-key.json
+
+# IDEs and editors
+.idea/
+.vscode/
+*.iml
+
+# Miscellaneous
+*.log
