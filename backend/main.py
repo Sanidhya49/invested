@@ -1,12 +1,15 @@
-# main.py (FINAL VERSION with Strategist Agent & Tool Use)
+# main.py (ASYNC VERSION with Strategist Agent & Tool Use)
 
 from fastapi import FastAPI, Depends, HTTPException, Header, Body
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
 import os
 import uuid
-import requests
+import httpx
 import json
+from fastapi.responses import JSONResponse
+import traceback
+import asyncio
 
 # Import Vertex AI and Tool Use libraries
 import vertexai
@@ -26,38 +29,59 @@ vertexai.init(project=GCP_PROJECT_ID, location=GCP_LOCATION)
 MOCK_SERVER_BASE_URL = "http://10.0.2.2:8080"
 
 # --- Authentication ---
-def verify_firebase_token(authorization: str = Header(...)):
+async def verify_firebase_token(authorization: str = Header(...)):
     try:
         id_token = authorization.split(" ").pop()
-        decoded_token = auth.verify_id_token(id_token)
+        decoded_token = await asyncio.to_thread(auth.verify_id_token, id_token)
         return decoded_token['uid']
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid Firebase token")
 
 @app.get("/start-fi-auth")
-def start_fi_auth(uid: str = Depends(verify_firebase_token)):
+async def start_fi_auth(uid: str = Depends(verify_firebase_token)):
     session_id = str(uuid.uuid4())
     db = firestore.client()
     user_doc_ref = db.collection("users").document(uid)
-    user_doc_ref.set({"fi_session_id": session_id}, merge=True)
+    await asyncio.to_thread(user_doc_ref.set, {"fi_session_id": session_id}, merge=True)
     auth_url = f"{MOCK_SERVER_BASE_URL}/mockWebPage?sessionId={session_id}"
     return {"auth_url": auth_url}
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
 # --- Dynamic Data Fetching ---
-def get_user_financial_data(uid: str, tool_name: str):
+async def get_user_financial_data(uid: str, tool_name: str, timeout=30):
     try:
         db = firestore.client()
-        user_doc = db.collection("users").document(uid).get()
+        user_doc = await asyncio.to_thread(db.collection("users").document(uid).get)
         if user_doc.exists and "fi_session_id" in user_doc.to_dict():
             session_id = user_doc.to_dict()["fi_session_id"]
             headers = {"X-Session-ID": session_id}
             request_body = {"tool_name": tool_name}
-            response = requests.post(f"http://localhost:8080/mcp/stream", headers=headers, json=request_body)
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        "http://localhost:8080/mcp/stream",
+                        headers=headers,
+                        json=request_body,
+                        timeout=timeout
+                    )
+            except httpx.TimeoutException:
+                print(f"❌ TIMEOUT: MCP server timed out for '{tool_name}'")
+                return {"error": f"Timeout fetching {tool_name} from MCP server."}
+            except Exception as e:
+                print(f"❌ ERROR: MCP server error for '{tool_name}': {e}")
+                return {"error": f"Error fetching {tool_name} from MCP server: {e}"}
             if response.status_code == 200:
                 print(f"✅ SUCCESS: Fetched '{tool_name}' data.")
                 return response.json()
-    except Exception:
-        pass
+            else:
+                print(f"⚠️ Error from mock server for tool '{tool_name}': {response.status_code}")
+                return {"error": f"Server returned {response.status_code}"}
+    except Exception as e:
+        print(f"❌ Failed to fetch live data for tool '{tool_name}'. Error: {e}")
+        traceback.print_exc()
     print(f"ℹ️ INFO: Fallback for '{tool_name}'.")
     return {"error": f"Could not fetch {tool_name}."}
 
@@ -96,50 +120,62 @@ market_data_tool = Tool(
 )
 
 # --- Gemini Model Call Function ---
-def call_gemini_text(prompt: str, model_name="gemini-2.5-flash", tools=None):
-    model = GenerativeModel(model_name, tools=tools)
-    response = model.generate_content(prompt)
-    if response.candidates[0].function_calls:
-        function_call = response.candidates[0].function_calls[0]
-        if function_call.name == "get_market_performance":
-            args = {key: value for key, value in function_call.args.items()}
-            tool_result = get_market_performance(**args)
-            final_response = model.generate_content(
-                Part.from_function_response(
-                    name="get_market_performance",
-                    response={"content": tool_result}
+def call_gemini_text(prompt: str, model_name="gemini-2.5-flash", tools=None, timeout=45):
+    try:
+        model = GenerativeModel(model_name, tools=tools)
+        response = model.generate_content(prompt)
+        if response.candidates[0].function_calls:
+            function_call = response.candidates[0].function_calls[0]
+            if function_call.name == "get_market_performance":
+                args = {key: value for key, value in function_call.args.items()}
+                tool_result = get_market_performance(**args)
+                final_response = model.generate_content(
+                    Part.from_function_response(
+                        name="get_market_performance",
+                        response={"content": tool_result}
+                    )
                 )
-            )
-            return final_response.text
-    return response.text
+                return final_response.text
+        return response.text
+    except Exception as e:
+        print(f"❌ Gemini API error: {e}")
+        traceback.print_exc()
+        return f"Error: Gemini API call failed: {e}"
 
 # --- Agent Endpoints ---
 @app.post("/ask-oracle")
-def ask_oracle(uid: str = Depends(verify_firebase_token), body: dict = Body(...)):
+async def ask_oracle(uid: str = Depends(verify_firebase_token), body: dict = Body(...)):
     question = body.get("question", "")
-    financial_data = get_user_financial_data(uid, tool_name="fetch_net_worth")
+    financial_data = await get_user_financial_data(uid, tool_name="fetch_net_worth")
     prompt = (f"You are Oracle... User's question: '{question}'\nData:\n{financial_data}")
-    return {"question": question, "answer": call_gemini_text(prompt)}
+    answer = await asyncio.to_thread(call_gemini_text, prompt)
+    return {"question": question, "answer": answer}
 
 @app.post("/run-guardian")
-def run_guardian(uid: str = Depends(verify_firebase_token), body: dict = Body(None)):
-    transactions = get_user_financial_data(uid, tool_name="fetch_bank_transactions")
-    credit = get_user_financial_data(uid, tool_name="fetch_credit_report")
+async def run_guardian(uid: str = Depends(verify_firebase_token), body: dict = Body(None)):
+    transactions, credit = await asyncio.gather(
+        get_user_financial_data(uid, tool_name="fetch_bank_transactions"),
+        get_user_financial_data(uid, tool_name="fetch_credit_report")
+    )
     data = {"transactions": transactions, "credit_report": credit}
     prompt = ("You are Guardian... Respond ONLY in JSON...\n" f"Data:\n{data}")
-    return {"alerts": call_gemini_text(prompt)}
+    answer = await asyncio.to_thread(call_gemini_text, prompt)
+    return {"alerts": answer}
 
 @app.post("/run-catalyst")
-def run_catalyst(uid: str = Depends(verify_firebase_token), body: dict = Body(None)):
-    net_worth = get_user_financial_data(uid, tool_name="fetch_net_worth")
-    epf = get_user_financial_data(uid, tool_name="fetch_epf_details")
+async def run_catalyst(uid: str = Depends(verify_firebase_token), body: dict = Body(None)):
+    net_worth, epf = await asyncio.gather(
+        get_user_financial_data(uid, tool_name="fetch_net_worth"),
+        get_user_financial_data(uid, tool_name="fetch_epf_details")
+    )
     data = {"net_worth_summary": net_worth, "epf_details": epf}
     prompt = ("You are Catalyst... Respond ONLY in JSON...\n" f"Data:\n{data}")
-    return {"opportunities": call_gemini_text(prompt)}
+    answer = await asyncio.to_thread(call_gemini_text, prompt)
+    return {"opportunities": answer}
 
 @app.post("/run-strategist")
-def run_strategist(uid: str = Depends(verify_firebase_token), body: dict = Body(None)):
-    stock_data = get_user_financial_data(uid, tool_name="fetch_stock_transactions")
+async def run_strategist(uid: str = Depends(verify_firebase_token), body: dict = Body(None)):
+    stock_data = await get_user_financial_data(uid, tool_name="fetch_stock_transactions")
     prompt = (
         "You are an expert Investment Strategist for the Indian market. "
         "1. Analyze the user's stock portfolio provided below. "
@@ -152,7 +188,7 @@ def run_strategist(uid: str = Depends(verify_firebase_token), body: dict = Body(
         f"User's Stock Portfolio:\n```json\n{stock_data}\n```"
     )
     try:
-        answer = call_gemini_text(prompt, tools=[market_data_tool])
+        answer = await asyncio.to_thread(call_gemini_text, prompt, tools=[market_data_tool])
     except Exception as e:
         answer = f"Error calling Gemini: {e}"
     return {"strategy": answer}
