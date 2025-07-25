@@ -151,6 +151,48 @@ class _HomeScreenState extends State<HomeScreen> {
     ProfileScreen(),
   ];
 
+  bool _isPrefetching = false;
+  String? _prefetchError;
+
+  @override
+  void initState() {
+    super.initState();
+    _prefetchBackendData();
+  }
+
+  Future<void> _prefetchBackendData() async {
+    setState(() {
+      _isPrefetching = true;
+      _prefetchError = null;
+    });
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final idToken = await user?.getIdToken();
+      final response = await http
+          .post(
+            Uri.parse('http://10.0.2.2:8000/prefetch-data'),
+            headers: {
+              'Authorization': 'Bearer $idToken',
+              'Content-Type': 'application/json',
+            },
+          )
+          .timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) {
+        setState(() {
+          _prefetchError = 'Prefetch failed: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _prefetchError = 'Prefetch error: $e';
+      });
+    } finally {
+      setState(() {
+        _isPrefetching = false;
+      });
+    }
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -178,6 +220,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(width: 8),
               const Text('Invested'),
+              if (_isPrefetching)
+                const Padding(
+                  padding: EdgeInsets.only(left: 16.0),
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
             ],
           ),
           backgroundColor: Colors.white.withOpacity(0.95),
